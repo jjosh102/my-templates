@@ -1,0 +1,39 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+  </PropertyGroup>
+
+  <PropertyGroup>
+    <Version>1.0.0</Version>
+    <PackageIcon>Nuget.png</PackageIcon>
+    <PackageType>Template</PackageType>
+    <PackageId>my-templates</PackageId>
+    <PackageTags>c#, templates, preference, personal </PackageTags>
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+
+    <Authors>jjosh102</Authors>
+    <Title>My Templates</Title>
+    <Description>My pre configured personal templates.</Description>
+    <PackageProjectUrl>https://github.com/jjosh102/my-templates</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/jjosh102/my-templates</RepositoryUrl>
+    <RepositoryType>git</RepositoryType>
+
+    <IncludeContentInPack>true</IncludeContentInPack>
+    <IncludeBuildOutput>false</IncludeBuildOutput>
+    <ContentTargetFolders>content</ContentTargetFolders>
+    <NoDefaultExcludes>true</NoDefaultExcludes>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <None Include="..\content\Nuget.png" Pack="true" Visible="false" PackagePath="" />
+    <None Include="..\README.md" Pack="true" Visible="false" PackagePath="\" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="**\.template.base\**\*" Exclude="**\bin\**;**\obj\**;**\.vs\**" />
+    <Content Include="**\.template.config\**\*" Exclude="**\bin\**;**\obj\**;**\.vs\**" />
+    <Compile Remove="**\*" />
+  </ItemGroup>
+
+</Project>

@@ -1,0 +1,84 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Josh J Piluden",
+  "classifications": [
+    "Web",
+    "api",
+    "Aspire"
+  ],
+  "name": "My Templates",
+  "description": "My personal templates reflecting my preferred directory structure and settings",
+  "identity": "my-templates",
+  "groupIdentity": "my-templates",
+  "shortName": "hybrid-app",
+  "defaultName": "MyTemplates",
+  "tags": {
+    "language": "C#",
+    "type": "project"
+  },
+  "sourceName": "MyTemplate",
+  "preferNameDirectory": false,
+  "symbols": {
+    "skipRestore": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "If specified, skips the automatic restore of the project on create.",
+      "defaultValue": "false"
+    },
+    "scripts": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "If specified, adds the scripts folder to the root.",
+      "defaultValue": "false"
+    },
+    "configs": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "If specified, adds the content of the configs folder to the root.",
+      "defaultValue": "false"
+    },
+    "app": {
+      "type": "parameter",
+      "datatype": "bool",
+      "description": "If specified, includes the hybrid-mod-mono template app.",
+      "defaultValue": "true"
+    }
+  },
+  "primaryOutputs": [
+    {
+      "path": "./"
+    }
+  ],
+  "sources": [
+    {
+      "condition": "(app)",
+      "source": "./.template.base/hybrid-mod-mono",
+      "target": "./"
+    },
+    {
+      "condition": "(scripts)",
+      "source": "./.template.base/scripts",
+      "target": "./scripts"
+    },
+    {
+      "condition": "(configs)",
+      "source": "./.template.base/configs",
+      "target": "./"
+    }
+  ],
+  "SpecialCustomOperations": {
+  },
+  "postActions": [
+    {
+      "condition": "(app && !skipRestore)",
+      "description": "Restore NuGet packages required by this project.",
+      "manualInstructions": [
+        {
+          "text": "Run 'dotnet restore'"
+        }
+      ],
+      "actionId": "210D431B-A78A-4D2F-B762-4ED3E3EA9025",
+      "continueOnError": true
+    }
+  ]
+}

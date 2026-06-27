@@ -1,0 +1,7 @@
+<Solution>
+  <Project Path="MyTemplate.Api/MyTemplate.Api.csproj" />
+  <Project Path="MyTemplate.AppHost/MyTemplate.AppHost.csproj" />
+  <Project Path="MyTemplate.IntegrationTests/MyTemplate.IntegrationTests.csproj" />
+  <Project Path="MyTemplate.ServiceDefaults/MyTemplate.ServiceDefaults.csproj" />
+  <Project Path="MyTemplate.UnitTests/MyTemplate.UnitTests.csproj" />
+</Solution>
