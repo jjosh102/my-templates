@@ -1,0 +1,16 @@
+<Solution>
+  <Project Path="src\templates.csproj" />
+  <Folder Name="/template/">
+    <Project Path="src\.template.base\hybrid-mod-mono\MyTemplate.Api\MyTemplate.Api.csproj" />
+    <Project Path="src\.template.base\hybrid-mod-mono\MyTemplate.AppHost\MyTemplate.AppHost.csproj" />
+    <Project Path="src\.template.base\hybrid-mod-mono\MyTemplate.ServiceDefaults\MyTemplate.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/template/tests/">
+    <Project Path="src\.template.base\hybrid-mod-mono\MyTemplate.UnitTests\MyTemplate.UnitTests.csproj" />
+    <Project Path="src\.template.base\hybrid-mod-mono\MyTemplate.IntegrationTests\MyTemplate.IntegrationTests.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests\MyTemplates.Tests\MyTemplates.Tests.csproj" />
+  </Folder>
+</Solution>
+

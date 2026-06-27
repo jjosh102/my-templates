@@ -8,10 +8,14 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+    # Required for OIDC trusted publishing
+    permissions:
+      id-token: write
+      contents: read
     steps:
     - name: Checkout
       uses: actions/checkout@v4
-      
+
     - name: Setup .NET 10
       uses: actions/setup-dotnet@v4
       with:
@@ -26,5 +30,5 @@ jobs:
     - name: Pack
       run: dotnet pack ./src/templates.csproj --configuration Release /p:Version=${VERSION} --output .
 
-    - name: Push Nuget Package
-      run: dotnet nuget push my-templates.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{secrets.NUGET_API_KEY}}
+    - name: Push to NuGet (Trusted Publishing)
+      run: dotnet nuget push my-templates.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json
