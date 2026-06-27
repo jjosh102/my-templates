@@ -5,20 +5,49 @@
   </PropertyGroup>
 
   <PropertyGroup>
+    <!-- Versioning - set by CI via /p:Version=$(VERSION), default for local builds -->
     <Version>1.0.0</Version>
-    <PackageIcon>Nuget.png</PackageIcon>
+
+    <!-- Package identity -->
     <PackageType>Template</PackageType>
     <PackageId>my-templates</PackageId>
-    <PackageTags>c#, templates, preference, personal </PackageTags>
-    <PackageReadmeFile>README.md</PackageReadmeFile>
-
-    <Authors>jjosh102</Authors>
     <Title>My Templates</Title>
-    <Description>My pre configured personal templates.</Description>
+    <Description>
+      A production-ready .NET 10 dotnet new template implementing the Hybrid Modular Monolith + Vertical Slices architecture.
+      Includes an ASP.NET Core Web API, .NET Aspire orchestration, pre-wired modules (Catalog, Identity, Orders, Notifications),
+      a Result pattern, FluentValidation pipeline, EF Core with SQL Server, and optional scripts and config files.
+    </Description>
+
+    <!-- Authorship -->
+    <Authors>Joshua J Piluden</Authors>
+    <Copyright>Copyright (c) Joshua J Piluden 2026</Copyright>
+
+    <!-- Discoverability -->
+    <PackageTags>dotnet;template;aspire;modular-monolith;vertical-slices;csharp;aspnetcore;efcore;architecture</PackageTags>
+
+    <!-- Links -->
     <PackageProjectUrl>https://github.com/jjosh102/my-templates</PackageProjectUrl>
     <RepositoryUrl>https://github.com/jjosh102/my-templates</RepositoryUrl>
     <RepositoryType>git</RepositoryType>
 
+    <!-- Readme & Icon -->
+    <PackageReadmeFile>README.md</PackageReadmeFile>
+    <PackageIcon>Nuget.png</PackageIcon>
+
+    <!-- License (MIT SPDX expression - preferred over LicenseUrl) -->
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+
+    <!-- Release notes -->
+    <PackageReleaseNotes>
+      v1.0.0 - Initial release.
+      - Hybrid Modular Monolith + Vertical Slices template for .NET 10
+      - Aspire orchestration (AppHost + ServiceDefaults)
+      - Modules: Catalog, Identity, Orders, Notifications
+      - Result pattern, FluentValidation endpoint filter, EF Core + SQL Server
+      - Optional --scripts and --configs flags for mix-and-match scaffolding
+    </PackageReleaseNotes>
+
+    <!-- Packing settings -->
     <IncludeContentInPack>true</IncludeContentInPack>
     <IncludeBuildOutput>false</IncludeBuildOutput>
     <ContentTargetFolders>content</ContentTargetFolders>
