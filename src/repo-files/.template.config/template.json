@@ -1,0 +1,40 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Josh J Piluden",
+  "classifications": [
+    "Scripts",
+    "Config",
+    "Repository"
+  ],
+  "name": "My Template Repo Files",
+  "description": "Adds my standard repository scripts and configuration files.",
+  "identity": "my-templates.repo-files",
+  "groupIdentity": "my-templates.repo-files",
+  "shortName": "repo-files",
+  "defaultName": "MyRepoFiles",
+  "tags": {
+    "type": "item"
+  },
+  "preferNameDirectory": false,
+  "primaryOutputs": [
+    {
+      "path": "./scripts/"
+    },
+    {
+      "path": "./.editorconfig"
+    },
+    {
+      "path": "./.gitignore"
+    }
+  ],
+  "sources": [
+    {
+      "source": "../.template.base/scripts",
+      "target": "./scripts"
+    },
+    {
+      "source": "../.template.base/configs",
+      "target": "./"
+    }
+  ]
+}

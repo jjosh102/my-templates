@@ -1,0 +1,29 @@
+{
+  "$schema": "http://json.schemastore.org/template",
+  "author": "Josh J Piluden",
+  "classifications": [
+    "Scripts",
+    "Tools"
+  ],
+  "name": "My Template Scripts",
+  "description": "Adds my standard repository scripts folder.",
+  "identity": "my-templates.repo-scripts",
+  "groupIdentity": "my-templates.repo-scripts",
+  "shortName": "scripts",
+  "defaultName": "MyScripts",
+  "tags": {
+    "type": "item"
+  },
+  "preferNameDirectory": false,
+  "primaryOutputs": [
+    {
+      "path": "./scripts/"
+    }
+  ],
+  "sources": [
+    {
+      "source": "../.template.base/scripts",
+      "target": "./scripts"
+    }
+  ]
+}

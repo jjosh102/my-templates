@@ -34,5 +34,15 @@ dotnet new hybrid-app -n MyApp --scripts --configs
 
 Generate *only* the scripts and configs (without the C# application code):
 ```bash
-dotnet new hybrid-app -n MyScriptsRepo --app false --scripts --configs
+dotnet new repo-files -n MyScriptsRepo
+```
+
+Generate only the scripts:
+```bash
+dotnet new scripts -n MyScriptsRepo
+```
+
+Generate only the configs:
+```bash
+dotnet new configs -n MyConfigsRepo
 ```

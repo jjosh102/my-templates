@@ -1,78 +1,58 @@
 using System.Diagnostics;
+using System.Text;
 using Xunit.Abstractions;
 
 namespace MyTemplates.Tests;
 
-public class TemplateIntegrationTests : IDisposable
+public sealed class TemplatePackageFixture : IDisposable
 {
-    private readonly ITestOutputHelper _output;
-    private readonly string _testDirectory;
+    private readonly string _fixtureDirectory;
 
-    public TemplateIntegrationTests(ITestOutputHelper output)
+    public TemplatePackageFixture()
     {
-        _output = output;
-        _testDirectory = Path.Combine(Path.GetTempPath(), "MyTemplatesTests", Guid.NewGuid().ToString("N"));
-        Directory.CreateDirectory(_testDirectory);
-    }
+        _fixtureDirectory = Path.Combine(
+            Path.GetTempPath(), "MyTemplatesFixture", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_fixtureDirectory);
 
-    [Fact]
-    public void Can_Create_Templates_With_Options()
-    {
-        // Arrange
         var currentDir = Directory.GetCurrentDirectory();
         var rootDir = Path.GetFullPath(Path.Combine(currentDir, "..", "..", "..", "..", ".."));
         var srcProject = Path.Combine(rootDir, "src", "templates.csproj");
-        var nupkgOutput = Path.Combine(_testDirectory, "nupkg");
+        var nupkgOutput = Path.Combine(_fixtureDirectory, "nupkg");
 
-        _output.WriteLine($"Packing template from: {srcProject}");
         var packResult = RunDotNet($"pack \"{srcProject}\" -c Release -o \"{nupkgOutput}\"");
-        Assert.True(packResult.ExitCode == 0, $"Pack failed: {packResult.Output}");
+        if (packResult.ExitCode != 0)
+            throw new InvalidOperationException($"Template pack failed: {packResult.Output}");
 
-        var nupkgFile = Directory.GetFiles(nupkgOutput, "*.nupkg").FirstOrDefault();
-        Assert.NotNull(nupkgFile);
+        NupkgFile = Directory.GetFiles(nupkgOutput, "*.nupkg").FirstOrDefault()
+            ?? throw new InvalidOperationException("No .nupkg file produced by pack.");
 
-        _output.WriteLine($"Installing template from nupkg: {nupkgFile}");
-        RunDotNet("new uninstall my-templates"); // Clean up existing to prevent duplicate sequence matches
-        var installResult = RunDotNet($"new install \"{nupkgFile}\" --force");
-        Assert.True(installResult.ExitCode == 0, $"Install failed: {installResult.Output}");
-
-        // Test 1: Default
-        _output.WriteLine("Testing Default options...");
-        var defaultDir = Path.Combine(_testDirectory, "DefaultApp");
-        Directory.CreateDirectory(defaultDir);
-        var createDefault = RunDotNet("new hybrid-app -n TestApp", defaultDir);
-        Assert.True(createDefault.ExitCode == 0, $"Default creation failed: {createDefault.Output}");
-        Assert.True(File.Exists(Path.Combine(defaultDir, "TestApp.slnx")));
-        Assert.False(Directory.Exists(Path.Combine(defaultDir, "scripts")));
-        Assert.False(File.Exists(Path.Combine(defaultDir, ".editorconfig")));
-        var buildDefault = RunDotNet("build TestApp.slnx", defaultDir);
-        Assert.True(buildDefault.ExitCode == 0, "Build failed");
-
-        // Test 2: With Scripts and Configs
-        _output.WriteLine("Testing Full options...");
-        var fullDir = Path.Combine(_testDirectory, "FullApp");
-        Directory.CreateDirectory(fullDir);
-        var createFull = RunDotNet("new hybrid-app -n FullApp --scripts --configs", fullDir);
-        Assert.True(createFull.ExitCode == 0, $"Full creation failed: {createFull.Output}");
-        Assert.True(File.Exists(Path.Combine(fullDir, "FullApp.slnx")));
-        Assert.True(Directory.Exists(Path.Combine(fullDir, "scripts")));
-        Assert.True(File.Exists(Path.Combine(fullDir, ".editorconfig")));
-        var buildFull = RunDotNet("build FullApp.slnx", fullDir);
-        Assert.True(buildFull.ExitCode == 0, "Build failed");
-
-        // Test 3: No App, Only Configs
-        _output.WriteLine("Testing No App options...");
-        var configDir = Path.Combine(_testDirectory, "ConfigOnly");
-        Directory.CreateDirectory(configDir);
-        var createConfig = RunDotNet("new hybrid-app -n ConfigOnly --app false --configs", configDir);
-        Assert.True(createConfig.ExitCode == 0, $"Config creation failed: {createConfig.Output}");
-        Assert.False(File.Exists(Path.Combine(configDir, "ConfigOnly.slnx")));
-        Assert.True(File.Exists(Path.Combine(configDir, ".editorconfig")));
+        // Ensure a clean install regardless of prior state.
+        RunDotNet("new uninstall my-templates");
+        var installResult = RunDotNet($"new install \"{NupkgFile}\" --force");
+        if (installResult.ExitCode != 0)
+            throw new InvalidOperationException($"Template install failed: {installResult.Output}");
     }
 
-    private (int ExitCode, string Output) RunDotNet(string arguments, string? workingDirectory = null)
+
+    public string NupkgFile { get; }
+
+    public void Dispose()
     {
-        var process = new Process
+        RunDotNet("new uninstall my-templates");
+        try
+        {
+            if (Directory.Exists(_fixtureDirectory))
+                Directory.Delete(_fixtureDirectory, recursive: true);
+        }
+        catch {}
+    }
+
+    internal static (int ExitCode, string Output) RunDotNet(
+        string arguments,
+        string? workingDirectory = null,
+        int timeoutMs = 120_000)
+    {
+        using var process = new Process
         {
             StartInfo = new ProcessStartInfo
             {
@@ -80,29 +60,164 @@ public class TemplateIntegrationTests : IDisposable
                 Arguments = arguments,
                 UseShellExecute = false,
                 CreateNoWindow = true,
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
                 WorkingDirectory = workingDirectory ?? Directory.GetCurrentDirectory()
             }
         };
 
+        var stdoutBuilder = new StringBuilder();
+        var stderrBuilder = new StringBuilder();
+
+        // Wire up async handlers BEFORE Start() to avoid missing early output.
+        process.OutputDataReceived += (_, e) => { if (e.Data is not null) stdoutBuilder.AppendLine(e.Data); };
+        process.ErrorDataReceived += (_, e) => { if (e.Data is not null) stderrBuilder.AppendLine(e.Data); };
+
         process.Start();
+        process.BeginOutputReadLine();
+        process.BeginErrorReadLine();
+
+        if (!process.WaitForExit(timeoutMs))
+        {
+            process.Kill(entireProcessTree: true);
+            return (-1, $"Timed out after {timeoutMs}ms running: dotnet {arguments}");
+        }
+
+        // Ensure async event handlers have fully flushed before reading builders.
         process.WaitForExit();
 
-        return (process.ExitCode, "");
+        return (process.ExitCode, stdoutBuilder.ToString() + stderrBuilder.ToString());
+    }
+}
+
+[Collection("TemplateIntegration")]
+public class TemplateIntegrationTests : IClassFixture<TemplatePackageFixture>
+{
+    private readonly ITestOutputHelper _output;
+    private readonly string _testDirectory;
+
+    public TemplateIntegrationTests(TemplatePackageFixture fixture, ITestOutputHelper output)
+    {
+        _output = output;
+        _testDirectory = Path.Combine(
+            Path.GetTempPath(), "MyTemplatesTests", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_testDirectory);
     }
 
-    public void Dispose()
+    [Fact]
+    public void HybridApp_Default_CreatesSlnxWithoutScriptsOrEditorconfig()
     {
-        RunDotNet("new uninstall my-templates");
-        try
-        {
-            if (Directory.Exists(_testDirectory))
-            {
-                Directory.Delete(_testDirectory, true);
-            }
-        }
-        catch (Exception ex)
-        {
-            _output.WriteLine($"Failed to clean up test directory: {ex.Message}");
-        }
+        var outputDir = NewDir("DefaultApp");
+
+        var result = RunDotNet("new hybrid-app -n TestApp", outputDir);
+        Assert.True(result.ExitCode == 0, $"Template creation failed:\n{result.Output}");
+
+        Assert.True(File.Exists(Path.Combine(outputDir, "TestApp.slnx")),
+            "Expected TestApp.slnx to exist.");
+        Assert.False(Directory.Exists(Path.Combine(outputDir, "scripts")),
+            "Did not expect a scripts/ directory.");
+        Assert.False(File.Exists(Path.Combine(outputDir, ".editorconfig")),
+            "Did not expect an .editorconfig file.");
+    }
+
+    [Fact]
+    public void HybridApp_WithScriptsAndConfigs_CreatesAllExpectedFiles()
+    {
+        var outputDir = NewDir("FullApp");
+
+        var result = RunDotNet("new hybrid-app -n FullApp --scripts --configs", outputDir);
+        Assert.True(result.ExitCode == 0, $"Template creation failed:\n{result.Output}");
+
+        Assert.True(File.Exists(Path.Combine(outputDir, "FullApp.slnx")),
+            "Expected FullApp.slnx to exist.");
+        Assert.True(Directory.Exists(Path.Combine(outputDir, "scripts")),
+            "Expected a scripts/ directory.");
+        Assert.True(File.Exists(Path.Combine(outputDir, ".editorconfig")),
+            "Expected an .editorconfig file.");
+    }
+
+    [Fact]
+    public void HybridApp_NoApp_OnlyCreatesEditorconfig()
+    {
+        var outputDir = NewDir("ConfigOnly");
+
+        var result = RunDotNet("new hybrid-app -n ConfigOnly --app false --configs", outputDir);
+        Assert.True(result.ExitCode == 0, $"Template creation failed:\n{result.Output}");
+
+        Assert.False(File.Exists(Path.Combine(outputDir, "ConfigOnly.slnx")),
+            "Did not expect a .slnx file when --app is false.");
+        Assert.True(File.Exists(Path.Combine(outputDir, ".editorconfig")),
+            "Expected an .editorconfig file.");
+    }
+
+    [Fact]
+    public void Scripts_Template_CreatesScriptsFolderOnly()
+    {
+        var outputDir = NewDir("ScriptsOnly");
+
+        var result = RunDotNet("new scripts -n ScriptsOnly", outputDir);
+        Assert.True(result.ExitCode == 0, $"Template creation failed:\n{result.Output}");
+
+        Assert.False(File.Exists(Path.Combine(outputDir, "ScriptsOnly.slnx")),
+            "Did not expect a .slnx file.");
+        Assert.True(Directory.Exists(Path.Combine(outputDir, "scripts")),
+            "Expected a scripts/ directory.");
+        Assert.True(File.Exists(Path.Combine(outputDir, "scripts", "code-cleanup.ps1")),
+            "Expected code-cleanup.ps1 inside scripts/.");
+        Assert.False(File.Exists(Path.Combine(outputDir, ".editorconfig")),
+            "Did not expect an .editorconfig file.");
+    }
+
+    [Fact]
+    public void Configs_Template_CreatesEditorconfigAndGitignore()
+    {
+        var outputDir = NewDir("ConfigsOnly");
+
+        var result = RunDotNet("new configs -n ConfigsOnly", outputDir);
+        Assert.True(result.ExitCode == 0, $"Template creation failed:\n{result.Output}");
+
+        Assert.False(File.Exists(Path.Combine(outputDir, "ConfigsOnly.slnx")),
+            "Did not expect a .slnx file.");
+        Assert.False(Directory.Exists(Path.Combine(outputDir, "scripts")),
+            "Did not expect a scripts/ directory.");
+        Assert.True(File.Exists(Path.Combine(outputDir, ".editorconfig")),
+            "Expected an .editorconfig file.");
+        Assert.True(File.Exists(Path.Combine(outputDir, ".gitignore")),
+            "Expected a .gitignore file.");
+    }
+
+    [Fact]
+    public void RepoFiles_Template_CreatesScriptsAndConfigs()
+    {
+        var outputDir = NewDir("RepoFiles");
+
+        var result = RunDotNet("new repo-files -n RepoFiles", outputDir);
+        Assert.True(result.ExitCode == 0, $"Template creation failed:\n{result.Output}");
+
+        Assert.False(File.Exists(Path.Combine(outputDir, "RepoFiles.slnx")),
+            "Did not expect a .slnx file.");
+        Assert.True(Directory.Exists(Path.Combine(outputDir, "scripts")),
+            "Expected a scripts/ directory.");
+        Assert.True(File.Exists(Path.Combine(outputDir, "scripts", "code-cleanup.ps1")),
+            "Expected code-cleanup.ps1 inside scripts/.");
+        Assert.True(File.Exists(Path.Combine(outputDir, ".editorconfig")),
+            "Expected an .editorconfig file.");
+        Assert.True(File.Exists(Path.Combine(outputDir, ".gitignore")),
+            "Expected a .gitignore file.");
+    }
+
+    private string NewDir(string name)
+    {
+        var dir = Path.Combine(_testDirectory, name);
+        Directory.CreateDirectory(dir);
+        return dir;
+    }
+
+    private (int ExitCode, string Output) RunDotNet(string arguments, string? workingDirectory = null)
+    {
+        _output.WriteLine($"dotnet {arguments}");
+        var result = TemplatePackageFixture.RunDotNet(arguments, workingDirectory);
+        _output.WriteLine(result.Output);
+        return result;
     }
 }

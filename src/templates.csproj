@@ -30,6 +30,7 @@
       - Modules: Catalog, Identity, Orders, Notifications
       - Result pattern, FluentValidation endpoint filter, EF Core + SQL Server
       - Optional --scripts and --configs flags for mix-and-match scaffolding
+      - Short repo-files, scripts, and configs templates for app-free scaffolding
     </PackageReleaseNotes>
     <IncludeContentInPack>true</IncludeContentInPack>
     <IncludeBuildOutput>false</IncludeBuildOutput>
