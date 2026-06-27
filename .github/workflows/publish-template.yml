@@ -30,5 +30,11 @@ jobs:
     - name: Pack
       run: dotnet pack ./src/templates.csproj --configuration Release /p:Version=${VERSION} --output .
 
-    - name: Push to NuGet (Trusted Publishing)
-      run: dotnet nuget push my-templates.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json
+    - name: NuGet login (Trusted Publishing)
+      uses: NuGet/login@v1
+      id: nuget_login
+      with:
+        user: ${{ github.repository_owner }}
+
+    - name: Push to NuGet
+      run: dotnet nuget push my-templates.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ steps.nuget_login.outputs.NUGET_API_KEY }}
