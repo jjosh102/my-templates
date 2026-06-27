@@ -8,7 +8,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-    # Required for OIDC trusted publishing
     permissions:
       id-token: write
       contents: read
@@ -30,5 +29,8 @@ jobs:
     - name: Pack
       run: dotnet pack ./src/templates.csproj --configuration Release /p:Version=${VERSION} --output .
 
-    - name: Push to NuGet (Trusted Publishing)
-      run: dotnet nuget push my-templates.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json
+    # NOTE: Using API key for now. Once the package exists on nuget.org and
+    # Trusted Publishing is configured (nuget.org -> package -> Trusted Publishers),
+    # replace --api-key with nothing and remove the secret entirely.
+    - name: Push to NuGet
+      run: dotnet nuget push my-templates.${VERSION}.nupkg --source https://api.nuget.org/v3/index.json --api-key ${{ secrets.NUGET_API_KEY }}
