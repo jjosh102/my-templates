@@ -1,8 +1,6 @@
-using MyTemplate.Api.Infrastructure;
-using MyTemplate.Api.Modules.Catalog;
-using MyTemplate.Api.Modules.Identity;
-using MyTemplate.Api.Modules.Notifications;
-using MyTemplate.Api.Modules.Orders;
+using MyTemplate.Api.Endpoints;
+using MyTemplate.Application;
+using MyTemplate.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -11,13 +9,8 @@ builder.AddServiceDefaults();
 // Add services to the container.
 builder.Services.AddOpenApi();
 
+builder.Services.AddApplication();
 builder.Services.AddInfrastructure(builder.Configuration);
-
-// Register Modules
-builder.Services.AddIdentityModule(builder.Configuration);
-builder.Services.AddCatalogModule();
-builder.Services.AddOrdersModule();
-builder.Services.AddNotificationsModule();
 
 var MyTemplate = builder.Build();
 
@@ -31,10 +24,9 @@ if (MyTemplate.Environment.IsDevelopment())
 
 MyTemplate.UseHttpsRedirection();
 
-// Map Module Endpoints
-MyTemplate.MapIdentityModule();
-MyTemplate.MapCatalogModule();
-MyTemplate.MapOrdersModule();
-MyTemplate.MapNotificationsModule();
+MyTemplate.MapCatalogEndpoints();
+MyTemplate.MapIdentityEndpoints();
+MyTemplate.MapOrdersEndpoints();
+MyTemplate.MapNotificationEndpoints();
 
 MyTemplate.Run();

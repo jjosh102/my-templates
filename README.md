@@ -21,7 +21,7 @@ dotnet new hybrid-app -n YourProjectName
 
 You can mix and match which parts of the template you want to scaffold using the following flags:
 
-* `--app`: Includes the Hybrid Modular Monolith template structure (Api, AppHost, etc.). Default is `true`.
+* `--app`: Includes the Hybrid Modular Monolith template structure (Core, Application, Infrastructure, Api, AppHost, architecture tests, etc.). Default is `true`.
 * `--scripts`: Adds a `scripts/` folder with utilities (e.g. code cleanup, user secrets) to the root of your new project. Default is `false`.
 * `--configs`: Adds standard repository config files (e.g. `.editorconfig`, `.gitignore`) directly to the root of your new project. Default is `false`.
 

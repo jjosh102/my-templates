@@ -10,9 +10,10 @@
     <PackageId>my-templates</PackageId>
     <Title>My Templates</Title>
     <Description>
-      A production-ready .NET 10 dotnet new template implementing the Hybrid Modular Monolith + Vertical Slices architecture.
-      Includes an ASP.NET Core Web API, .NET Aspire orchestration, pre-wired modules (Catalog, Identity, Orders, Notifications),
-      a Result pattern, FluentValidation pipeline, EF Core with SQL Server, and optional scripts and config files.
+      A production-ready .NET 10 dotnet new template implementing a Hybrid Modular Monolith with application-owned vertical slices.
+      Includes separate Core, Application, Infrastructure, and Api projects, .NET Aspire orchestration, pre-wired modules
+      (Catalog, Identity, Orders, Notifications), a Result pattern, FluentValidation pipeline, EF Core with SQL Server,
+      executable architecture tests, and optional scripts and config files.
     </Description>
     <Authors>Joshua J Piluden</Authors>
     <Copyright>Copyright (c) Joshua J Piluden 2026</Copyright>
@@ -25,10 +26,12 @@
     <PackageLicenseExpression>MIT</PackageLicenseExpression>
     <PackageReleaseNotes>
       v1.0.0 - Initial release.
-      - Hybrid Modular Monolith + Vertical Slices template for .NET 10
+      - Hybrid Modular Monolith with application-owned vertical slices for .NET 10
+      - Separate Core, Application, Infrastructure, and Api project boundaries
       - Aspire orchestration (AppHost + ServiceDefaults)
       - Modules: Catalog, Identity, Orders, Notifications
       - Result pattern, FluentValidation endpoint filter, EF Core + SQL Server
+      - Architecture tests for dependency direction and slice naming rules
       - Optional --scripts and --configs flags for mix-and-match scaffolding
       - Short repo-files, scripts, and configs templates for app-free scaffolding
     </PackageReleaseNotes>

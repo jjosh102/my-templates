@@ -1,1428 +1,187 @@
-# Hybrid Modular Monolith + Vertical Slice Architecture
+# Hybrid Modular Monolith With Application-Owned Vertical Slices
 
-## A Pragmatic Architecture for Modern Application Development
+## A practical architecture for growing applications
 
-A hybrid modular monolith with vertical slices is an architecture style that combines two useful ideas:
+A hybrid modular monolith with application-owned vertical slices combines two useful ideas:
 
 ```text
 Modular monolith = organize the system around business boundaries.
-Vertical slice architecture = organize each feature around a complete use case.
+Vertical slices = organize callable behavior around complete use cases.
 ```
 
-The result is a single deployable application that is internally divided into clear modules, while each module is implemented as feature-oriented slices instead of broad technical layers.
+This version adds one extra rule:
 
-This architecture is not about theoretical purity. It is about building software that can grow without becoming tangled, while avoiding the operational cost of premature microservices.
+```text
+Core owns business concepts.
+Application owns callable use cases.
+Infrastructure owns technical implementations.
+Entrypoints adapt transport input and output.
+```
+
+That gives the system clear boundaries without forcing every feature into heavy layers or early microservices.
+
+The examples in this article use a generic online ordering system because most people understand the basic flow: browse items, place an order, pay, and receive a confirmation.
 
 ---
 
 ## 1. The Core Idea
 
-Most applications start simple. Then they grow. The danger is not that the first version is too small. The danger is that the structure does not give the codebase a way to grow safely.
-
-A hybrid modular monolith + vertical slice approach creates two levels of organization:
+The architecture separates four concerns:
 
 ```text
+What is the business concept?
+What use case is being performed?
+What technical system makes it work?
+How does a caller interact with it?
+```
+
+Those map to four zones:
+
+```text
+Core
+  Business modules, contracts, domain models, policies, and rules.
+
 Application
-  └── Modules
-        └── Features
-              ├── Endpoint / Controller / Message Handler
-              ├── Request
-              ├── Response
-              ├── Validator
-              ├── Handler
-              └── Supporting feature-specific code
+  Callable use cases, request/response DTOs, validation, orchestration, and results.
+
+Infrastructure
+  Database, providers, templates, files, queues, external APIs, and technical clients.
+
+Entrypoints
+  HTTP APIs, CLI commands, background workers, bot commands, mobile hosts, or desktop hosts.
 ```
 
-The module answers:
+The dependency flow is:
 
 ```text
-Which business area owns this behavior?
+Entrypoint
+  -> Application use case
+       -> Core contracts and domain rules
+       -> Infrastructure implementation, wired by the composition root
 ```
 
-The vertical slice answers:
+The simple rule:
 
 ```text
-Which use case does this code support?
+Callers use Application.
+Core is not an entrypoint API.
+Infrastructure is not an entrypoint API.
 ```
-
-The architecture is called hybrid because it does not follow a single strict school of architecture. It borrows the useful parts of modular monoliths, vertical slices, domain-driven design, clean architecture, and pragmatic data access, while avoiding unnecessary ceremony.
 
 ---
 
-## 2. What Problem This Solves
+## 2. Why This Shape Helps
 
-Traditional layered applications usually start like this:
+Traditional layered applications often start like this:
 
 ```text
 Controllers/
 Services/
 Repositories/
-Entities/
+Models/
 DTOs/
 Validators/
 ```
 
-This looks clean at first, but over time it often becomes difficult to change. A single feature is scattered across many folders. To understand one use case, a developer may need to jump through controller, service, repository, mapper, validator, DTO, and configuration files.
+That looks tidy at first, but a single use case can become scattered across many technical folders. To understand one behavior, a developer may need to jump through a controller, service, repository, mapper, validator, DTO, and provider.
 
-The structure is organized by technical type, not by business behavior.
-
-A feature-oriented structure instead groups the code needed for one use case:
+This architecture avoids two common problems:
 
 ```text
-Features/
-  AddItemToCart/
-    AddItemToCartEndpoint.cs
-    AddItemToCartRequest.cs
-    AddItemToCartResponse.cs
-    AddItemToCartValidator.cs
-    AddItemToCartHandler.cs
+Too little structure:
+  Everything can call everything else.
+
+Too much structure:
+  Every feature needs layers of ceremony before it can do useful work.
 ```
 
-This makes the system easier to navigate because the unit of change is usually a feature, not a technical layer.
-
-The modular monolith part solves a different problem: feature folders alone are not enough for a large system. Without module boundaries, feature folders can still become a flat pile of unrelated use cases.
-
-Modules give the system business boundaries:
+The compromise is:
 
 ```text
-Modules/
-  Identity/
-  Billing/
-  Catalog/
-  Orders/
-  Notifications/
-  Reporting/
+Keep domain code pure.
+Keep callable use cases close together.
+Keep infrastructure details out of Application.
+Keep entrypoints thin.
+Enforce dependency direction with tests.
 ```
-
-Vertical slices inside modules give each boundary an implementation style that stays focused on use cases.
 
 ---
 
-## 3. The Recommended Structure
+## 3. Recommended Project Roles
 
-A practical backend structure can look like this:
+A practical .NET solution can look like this:
 
 ```text
 src/
-  App.Api/
-    Program.cs
-
-    Modules/
-      Identity/
-        IdentityModule.cs
-        Domain/
-        Contracts/
-        Features/
-          RegisterUser/
-          Login/
-          GetCurrentUser/
-
-      Catalog/
-        CatalogModule.cs
-        Domain/
-        Contracts/
-        Features/
-          CreateProduct/
-          SearchProducts/
-          GetProductDetails/
-
-      Orders/
-        OrdersModule.cs
-        Domain/
-        Contracts/
-        Features/
-          PlaceOrder/
-          CancelOrder/
-          GetOrderHistory/
-
-      Notifications/
-        NotificationsModule.cs
-        Domain/
-        Contracts/
-        Features/
-          SendNotification/
-          MarkNotificationRead/
-
-    Shared/
-      Auth/
-      Errors/
-      Results/
-      Validation/
-      Pagination/
-      Time/
-
-    Infrastructure/
-      Persistence/
-      Caching/
-      BackgroundJobs/
-      Email/
-      Files/
-      Observability/
+  Shop.Core/
+  Shop.Application/
+  Shop.Infrastructure/
+  Shop.Api/
+  Shop.Cli/
 
 tests/
-  App.UnitTests/
-  App.IntegrationTests/
-  App.ArchitectureTests/
+  Shop.Core.Tests/
+  Shop.Application.Tests/
+  Shop.Infrastructure.IntegrationTests/
+  Shop.ArchitectureTests/
 ```
 
-This structure has three important zones:
+The project roles are:
 
-| Zone | Purpose |
+| Project | Role |
 |---|---|
-| `Modules` | Business boundaries and feature slices. |
-| `Shared` | Small cross-cutting abstractions and utilities used by many modules. |
-| `Infrastructure` | Technical implementation details such as persistence, caching, jobs, email, file storage, and observability. |
+| `Shop.Core` | Business modules, contracts, domain models, rules, and module-owned policies. |
+| `Shop.Application` | Callable use cases, cross-module orchestration, request/response DTOs, validation, and result primitives. |
+| `Shop.Infrastructure` | EF Core, persistence, provider clients, templates, migrations, files, queues, and external systems. |
+| `Shop.Api` | HTTP host and composition root. |
+| `Shop.Cli` | Command-line adapter over Application use cases. |
 
-The rule is simple:
-
-```text
-Business code lives in modules.
-Reusable cross-cutting concepts live in Shared.
-Technical implementation lives in Infrastructure.
-```
+The names can change. The responsibilities should not.
 
 ---
 
-## 4. Module Design
+## 4. Dependency Direction
 
-A module is a business boundary, not just a folder. It owns a related set of features, domain rules, and data.
-
-A module should usually contain:
+The target dependency direction is:
 
 ```text
-ModuleName/
-  ModuleNameModule.cs
-  Domain/
-  Contracts/
-  Features/
+Core
+  -> BCL only, or as close to BCL-only as practical
+
+Application
+  -> Core
+
+Infrastructure
+  -> Core
+
+Entrypoints and composition roots
+  -> Application
+  -> Infrastructure
 ```
 
-Optional folders can be added only when needed:
+Application and Infrastructure both depend on Core, but not on each other.
+
+That is intentional.
+
+Application depends on Core because it needs business contracts and domain concepts while orchestrating use cases. Infrastructure depends on Core because it implements Core contracts and maps Core concepts to databases, providers, files, templates, and external APIs.
+
+The reverse direction should be forbidden:
 
 ```text
-ModuleName/
-  Events/
-  Policies/
-  ReadModels/
-  Jobs/
-  Mappings/
+Core must not depend on Application.
+Core must not depend on Infrastructure.
+Application must not depend on Infrastructure.
+Infrastructure must not depend on Application.
+Entrypoints must not call Core directly.
 ```
 
-Do not create folders just because an architecture diagram says they exist. Create them when the module actually needs them.
-
-### 4.1 Module Responsibilities
-
-A module owns:
-
-- its business rules,
-- its write operations,
-- its domain entities,
-- its feature handlers,
-- its module-specific contracts,
-- its route registration or message registration,
-- its logical data ownership.
-
-A module should not expose its internal implementation to other modules.
-
-### 4.2 Public Module Contracts
-
-When another module needs to interact with a module, it should depend on a contract, not internal domain or persistence code.
-
-Example:
-
-```text
-Modules/
-  Catalog/
-    Contracts/
-      ICatalogLookup.cs
-      ProductSummary.cs
-    Domain/
-      Product.cs
-    Features/
-      SearchProducts/
-```
-
-Other modules may depend on:
-
-```text
-Catalog.Contracts
-```
-
-Other modules must not depend on:
-
-```text
-Catalog.Domain.Product
-Catalog.Features.SearchProducts.SearchProductsHandler
-Catalog.Persistence.ProductConfiguration
-```
-
-This keeps the module boundary clean.
-
-### 4.3 Dependency Rule
-
-A pragmatic rule:
-
-```text
-A module may depend on another module's Contracts folder.
-A module must not depend on another module's Domain, Features, or Persistence internals.
-```
-
-This is much easier to enforce than a strict distributed system boundary while still preventing the worst coupling.
+This prevents the domain from slowly becoming aware of HTTP, EF Core, email providers, background workers, UI code, or hosting concerns.
 
 ---
 
-## 5. Vertical Slice Design
+## 5. Core Is Not a Feature Folder
 
-A vertical slice is a complete use case packaged together.
-
-Example:
-
-```text
-Modules/
-  Orders/
-    Features/
-      PlaceOrder/
-        PlaceOrderEndpoint.cs
-        PlaceOrderRequest.cs
-        PlaceOrderResponse.cs
-        PlaceOrderValidator.cs
-        PlaceOrderHandler.cs
-```
-
-A slice should contain code that changes together.
-
-The endpoint handles HTTP concerns. The validator handles request validation. The handler orchestrates the use case. The response defines the output shape.
-
-### 5.1 What Belongs in a Slice
-
-A slice may contain:
-
-- endpoint mapping,
-- request model,
-- response model,
-- validator,
-- handler,
-- feature-specific mapping,
-- feature-specific query projection,
-- feature-specific authorization logic,
-- feature-specific tests.
-
-### 5.2 What Does Not Belong in a Slice
-
-A slice should not contain unrelated shared business rules. If multiple slices need the same real business rule, move it into the module domain or a module service.
-
-A slice should not become a dumping ground. The purpose is local cohesion, not copying the same logic everywhere.
-
-### 5.3 Handler Responsibility
-
-A handler should orchestrate one use case:
-
-```text
-Validate business conditions.
-Load required data.
-Apply business rules.
-Persist changes.
-Return a result.
-```
-
-It should not become a generic service with many unrelated methods.
-
-Bad:
-
-```csharp
-public sealed class OrderService
-{
-    public Task PlaceOrder(...);
-    public Task CancelOrder(...);
-    public Task RefundOrder(...);
-    public Task UpdateShippingAddress(...);
-    public Task GetOrderHistory(...);
-}
-```
-
-Better:
-
-```csharp
-public sealed class PlaceOrderHandler
-{
-    public Task<Result<PlaceOrderResponse>> HandleAsync(
-        PlaceOrderRequest request,
-        CancellationToken cancellationToken)
-    {
-        // Use case logic
-    }
-}
-```
-
-A handler should be boring, direct, and easy to read.
-
----
-
-## 6. Minimal API Example in .NET
-
-The pattern works with controllers, message handlers, CLI commands, or background jobs. In ASP.NET Core, Minimal APIs fit this architecture well because route mapping can live directly beside the feature.
-
-Example feature folder:
-
-```text
-Modules/
-  Orders/
-    Features/
-      PlaceOrder/
-        PlaceOrderEndpoint.cs
-        PlaceOrderRequest.cs
-        PlaceOrderResponse.cs
-        PlaceOrderValidator.cs
-        PlaceOrderHandler.cs
-```
-
-Endpoint:
-
-```csharp
-namespace App.Api.Modules.Orders.Features.PlaceOrder;
-
-public static class PlaceOrderEndpoint
-{
-    public static RouteGroupBuilder MapPlaceOrderEndpoint(this RouteGroupBuilder group)
-    {
-        group.MapPost("/", HandleAsync)
-            .WithName("PlaceOrder")
-            .Produces<PlaceOrderResponse>(StatusCodes.Status201Created)
-            .ProducesProblem(StatusCodes.Status400BadRequest)
-            .ProducesProblem(StatusCodes.Status409Conflict);
-
-        return group;
-    }
-
-    private static async Task<IResult> HandleAsync(
-        PlaceOrderRequest request,
-        PlaceOrderHandler handler,
-        CancellationToken cancellationToken)
-    {
-        var result = await handler.HandleAsync(request, cancellationToken);
-        return result.ToHttpResult();
-    }
-}
-```
-
-Request:
-
-```csharp
-namespace App.Api.Modules.Orders.Features.PlaceOrder;
-
-public sealed record PlaceOrderRequest(
-    Guid CustomerId,
-    IReadOnlyList<PlaceOrderItemRequest> Items);
-
-public sealed record PlaceOrderItemRequest(
-    Guid ProductId,
-    int Quantity);
-```
-
-Response:
-
-```csharp
-namespace App.Api.Modules.Orders.Features.PlaceOrder;
-
-public sealed record PlaceOrderResponse(
-    Guid OrderId,
-    string Status,
-    decimal Total);
-```
-
-Validator:
-
-```csharp
-namespace App.Api.Modules.Orders.Features.PlaceOrder;
-
-public sealed class PlaceOrderValidator : AbstractValidator<PlaceOrderRequest>
-{
-    public PlaceOrderValidator()
-    {
-        RuleFor(x => x.CustomerId).NotEmpty();
-        RuleFor(x => x.Items).NotEmpty();
-        RuleForEach(x => x.Items).ChildRules(item =>
-        {
-            item.RuleFor(x => x.ProductId).NotEmpty();
-            item.RuleFor(x => x.Quantity).GreaterThan(0);
-        });
-    }
-}
-```
-
-Handler:
-
-```csharp
-namespace App.Api.Modules.Orders.Features.PlaceOrder;
-
-public sealed class PlaceOrderHandler
-{
-    private readonly AppDbContext _db;
-    private readonly IClock _clock;
-
-    public PlaceOrderHandler(AppDbContext db, IClock clock)
-    {
-        _db = db;
-        _clock = clock;
-    }
-
-    public async Task<Result<PlaceOrderResponse>> HandleAsync(
-        PlaceOrderRequest request,
-        CancellationToken cancellationToken)
-    {
-        var customerExists = await _db.Customers
-            .AnyAsync(x => x.Id == request.CustomerId, cancellationToken);
-
-        if (!customerExists)
-        {
-            return Result.NotFound<PlaceOrderResponse>("Customer was not found.");
-        }
-
-        var productIds = request.Items.Select(x => x.ProductId).Distinct().ToList();
-
-        var products = await _db.Products
-            .Where(x => productIds.Contains(x.Id))
-            .ToListAsync(cancellationToken);
-
-        if (products.Count != productIds.Count)
-        {
-            return Result.Validation<PlaceOrderResponse>("One or more products were not found.");
-        }
-
-        var order = Order.Place(
-            request.CustomerId,
-            request.Items.Select(x => new OrderItemInput(x.ProductId, x.Quantity)),
-            products,
-            _clock.UtcNow);
-
-        _db.Orders.Add(order);
-        await _db.SaveChangesAsync(cancellationToken);
-
-        return Result.Created(new PlaceOrderResponse(
-            order.Id,
-            order.Status.ToString(),
-            order.Total));
-    }
-}
-```
-
-This is intentionally direct. There is no automatic repository abstraction. There is no generic service layer. The handler uses the database context directly because the use case is clearer that way.
-
----
-
-## 7. Module Registration
-
-Each module should register its own services and endpoints.
-
-```csharp
-namespace App.Api.Modules.Orders;
-
-public static class OrdersModule
-{
-    public static IServiceCollection AddOrdersModule(this IServiceCollection services)
-    {
-        services.AddScoped<PlaceOrderHandler>();
-        services.AddScoped<CancelOrderHandler>();
-        services.AddScoped<GetOrderHistoryHandler>();
-        services.AddScoped<IOrdersLookup, OrdersLookup>();
-
-        return services;
-    }
-
-    public static IEndpointRouteBuilder MapOrdersModule(this IEndpointRouteBuilder app)
-    {
-        var group = app.MapGroup("/api/orders")
-            .WithTags("Orders")
-            .RequireAuthorization();
-
-        group.MapPlaceOrderEndpoint();
-        group.MapCancelOrderEndpoint();
-        group.MapGetOrderHistoryEndpoint();
-
-        return app;
-    }
-}
-```
-
-Program startup stays clean:
-
-```csharp
-var builder = WebApplication.CreateBuilder(args);
-
-builder.Services.AddInfrastructure(builder.Configuration);
-
-builder.Services.AddIdentityModule(builder.Configuration);
-builder.Services.AddCatalogModule();
-builder.Services.AddOrdersModule();
-builder.Services.AddNotificationsModule();
-
-var app = builder.Build();
-
-app.UseExceptionHandler();
-app.UseAuthentication();
-app.UseAuthorization();
-
-app.MapIdentityModule();
-app.MapCatalogModule();
-app.MapOrdersModule();
-app.MapNotificationsModule();
-
-app.Run();
-```
-
-The application is still one deployable unit, but the internal structure makes the system easier to understand and enforce.
-
----
-
-## 8. Data Access Strategy
-
-A pragmatic modular monolith usually starts with:
-
-```text
-One application database.
-One application DbContext.
-Logical table ownership by module.
-Direct EF Core usage in feature handlers.
-```
-
-This is intentionally different from pretending every module is already a microservice.
-
-### 8.1 Logical Ownership
-
-Even with one database, each module should own certain tables.
-
-Example:
-
-| Module | Owned Tables |
-|---|---|
-| Identity | users, roles, user_profiles |
-| Catalog | products, categories, product_images |
-| Orders | orders, order_items, order_status_history |
-| Payments | payments, payment_attempts |
-| Notifications | notifications, notification_preferences |
-
-The ownership rule:
-
-```text
-Only the owning module writes to its tables.
-Other modules may read through contracts, projections, or explicit read models.
-```
-
-This prevents every module from becoming a free-for-all database script.
-
-### 8.2 Direct DbContext Usage
-
-Direct DbContext usage is often the simplest correct choice.
-
-Good:
-
-```csharp
-var order = await _db.Orders
-    .Include(x => x.Items)
-    .FirstOrDefaultAsync(x => x.Id == request.OrderId, cancellationToken);
-```
-
-Often unnecessary:
-
-```csharp
-var order = await _orderRepository.GetByIdWithItemsAsync(request.OrderId);
-```
-
-A repository can be useful when it contains meaningful domain-specific behavior or hides a genuinely complex data source. A generic repository over EF Core usually adds indirection without adding value.
-
-### 8.3 When to Add a Repository
-
-Add a repository only when at least one of these is true:
-
-- the aggregate has complex persistence rules,
-- the data source is not EF Core,
-- the module must hide persistence from rich domain logic,
-- queries are reused heavily and have meaningful names,
-- persistence details are volatile,
-- the repository protects important invariants.
-
-Do not add a repository just to satisfy an architecture diagram.
-
-### 8.4 Read Composition
-
-Read screens often need data from multiple modules. For performance and simplicity, allow read-only composition queries.
-
-Example:
-
-```text
-Order history screen needs:
-- order status from Orders,
-- product names from Catalog,
-- payment status from Payments.
-```
-
-A read-only query may join across tables if it does not write into another module's owned tables.
-
-Rule:
-
-```text
-Writes must respect module ownership.
-Reads may compose data pragmatically.
-```
-
-This is one of the most important pragmatic compromises in this architecture.
-
----
-
-## 9. Transactions and Consistency
-
-Because the application is a monolith with one database, most use cases can use a normal database transaction.
-
-For a single module write:
-
-```text
-Handler changes entities.
-Handler calls SaveChangesAsync.
-Database transaction commits.
-```
-
-For multi-module workflows, avoid directly modifying another module's tables. Prefer one of these:
-
-1. Call a contract exposed by the owning module.
-2. Publish an in-process domain event.
-3. Use an outbox if reliability matters.
-4. Use a background job for delayed work.
-
-### 9.1 In-Process Events
-
-In-process events are useful when one module needs to react after something happens.
-
-Example:
-
-```text
-Orders module publishes OrderPlaced.
-Notifications module sends confirmation notification.
-Reporting module updates projections.
-```
-
-The event should represent something that already happened:
-
-```csharp
-public sealed record OrderPlaced(
-    Guid OrderId,
-    Guid CustomerId,
-    DateTimeOffset PlacedAt);
-```
-
-Do not use events as a way to hide synchronous command calls when the workflow must succeed immediately.
-
-### 9.2 Outbox Pattern
-
-Use an outbox when work must not be lost after the main transaction commits.
-
-Example:
-
-```text
-Place order.
-Save order and outbox message in same transaction.
-Background worker later sends email or publishes external event.
-```
-
-This avoids the common failure mode:
-
-```text
-Database save succeeds.
-Email send fails.
-Application has no durable record to retry email.
-```
-
-An outbox is not required on day one for every project. Add it when reliability matters.
-
----
-
-## 10. Validation Strategy
-
-Use two levels of validation:
-
-```text
-Request validation = shape and basic input correctness.
-Business validation = domain rules and current state checks.
-```
-
-Request validation examples:
-
-- required fields,
-- max length,
-- valid email format,
-- positive quantity,
-- valid enum value.
-
-Business validation examples:
-
-- cannot cancel an order that already shipped,
-- cannot add an inactive product to an order,
-- cannot refund more than the captured amount,
-- cannot invite a user who is already a member.
-
-Request validation can live in the feature validator.
-
-Business validation should live in the handler, domain entity, domain service, or module policy, depending on complexity.
-
----
-
-## 11. Error Handling
-
-A shared result type can keep handlers readable and endpoint responses consistent.
-
-Example:
-
-```csharp
-public sealed record Error(string Code, string Message);
-
-public sealed class Result<T>
-{
-    public bool IsSuccess { get; }
-    public T? Value { get; }
-    public Error? Error { get; }
-    public ResultStatus Status { get; }
-}
-```
-
-Endpoint conversion:
-
-```csharp
-public static IResult ToHttpResult<T>(this Result<T> result)
-{
-    return result.Status switch
-    {
-        ResultStatus.Ok => Results.Ok(result.Value),
-        ResultStatus.Created => Results.Created(string.Empty, result.Value),
-        ResultStatus.NotFound => Results.NotFound(ToProblem(result)),
-        ResultStatus.Validation => Results.BadRequest(ToProblem(result)),
-        ResultStatus.Conflict => Results.Conflict(ToProblem(result)),
-        _ => Results.Problem("Unexpected error")
-    };
-}
-```
-
-This prevents every endpoint from manually translating errors in a different way.
-
----
-
-## 12. Authorization Strategy
-
-Authorization should be explicit at the route or feature level.
-
-Examples:
-
-```csharp
-group.MapPost("/", HandleAsync)
-    .RequireAuthorization("CanPlaceOrders");
-```
-
-For ownership checks, route authorization is not enough. The handler must verify the current user can act on the specific resource.
-
-Example:
-
-```csharp
-if (order.CustomerId != currentUser.UserId)
-{
-    return Result.Forbidden<OrderResponse>("You cannot access this order.");
-}
-```
-
-Use policies for broad access rules. Use handler checks for resource-specific ownership rules.
-
----
-
-## 13. Shared Kernel vs Shared Utilities
-
-Shared code is useful, but it can become a dumping ground.
-
-Keep `Shared` small.
-
-Good shared concepts:
-
-- `Result<T>`,
-- error models,
-- pagination models,
-- clock abstraction,
-- current user abstraction,
-- validation behavior,
-- common guard helpers,
-- base value objects only when truly universal.
-
-Bad shared concepts:
-
-- generic business services,
-- vague helpers,
-- cross-module domain entities,
-- shared repositories,
-- a universal `CommonService`,
-- god-level mapping utilities.
-
-Rule:
-
-```text
-If the code has business meaning, it probably belongs to a module.
-If the code has technical or cross-cutting meaning, it may belong in Shared or Infrastructure.
-```
-
----
-
-## 14. Testing Strategy
-
-This architecture benefits from three test categories.
-
-### 14.1 Unit Tests
-
-Use unit tests for pure business rules and small domain behavior.
-
-Examples:
-
-- status transitions,
-- price calculations,
-- validation rules,
-- domain methods,
-- mapping logic with no external dependency.
-
-### 14.2 Integration Tests
-
-Use integration tests for feature handlers and endpoints.
-
-Examples:
-
-- create order endpoint returns 201,
-- duplicate order is rejected,
-- unauthorized user cannot access another user's resource,
-- search endpoint returns paged results,
-- database constraints are respected.
-
-For many applications, integration tests are more valuable than heavily mocked unit tests because the feature handler depends on EF Core, validation, authorization, and persistence behavior.
-
-### 14.3 Architecture Tests
-
-Architecture tests enforce boundaries.
-
-They should verify:
-
-- modules do not reference another module's internal folders,
-- no controller classes exist if Minimal APIs are the chosen API style,
-- domain entities do not depend on web framework types,
-- infrastructure does not leak into domain code,
-- forbidden project references do not exist,
-- naming conventions are followed,
-- endpoints are registered through modules.
-
-Example using NetArchTest-style rules:
-
-```csharp
-[Fact]
-public void Modules_Should_Not_Depend_On_Other_Module_Internals()
-{
-    var result = Types.InCurrentDomain()
-        .That()
-        .ResideInNamespace("App.Api.Modules.Orders")
-        .ShouldNot()
-        .HaveDependencyOn("App.Api.Modules.Catalog.Domain")
-        .GetResult();
-
-    Assert.True(result.IsSuccessful);
-}
-```
-
-Architecture tests are important because module boundaries are only real if the build can catch violations.
-
----
-
-## 15. Frontend Alignment
-
-The same idea can be applied to frontend code.
-
-Avoid organizing frontend code only by technical type:
-
-```text
-components/
-pages/
-services/
-models/
-```
-
-Prefer feature-oriented structure:
-
-```text
-src/app/
-  features/
-    auth/
-    catalog/
-    orders/
-    account/
-    notifications/
-
-  shared/
-    components/
-    pipes/
-    directives/
-    models/
-
-  core/
-    api/
-    auth/
-    guards/
-    interceptors/
-    layout/
-    config/
-```
-
-Frontend features should call backend APIs. They should not bypass the backend and call protected external providers directly.
-
-Rule:
-
-```text
-Frontend feature folders should mirror product capabilities, not database tables.
-```
-
----
-
-## 16. Comparison With Other Popular Architectures
-
-No architecture is universally best. The right architecture depends on team size, domain complexity, deployment requirements, scaling needs, and expected rate of change.
-
-### 16.1 Traditional Layered Architecture
-
-Typical structure:
-
-```text
-Controllers/
-Services/
-Repositories/
-Entities/
-DTOs/
-```
-
-Pros:
-
-- familiar to many developers,
-- easy to start,
-- works well for small CRUD applications,
-- simple mental model,
-- many tutorials follow it.
-
-Cons:
-
-- features are scattered across technical layers,
-- service layer often becomes bloated,
-- repository layer often adds little value over ORM,
-- business boundaries are weak,
-- high risk of god services,
-- changes often touch many folders.
-
-When to use:
-
-- very small apps,
-- simple CRUD admin tools,
-- prototypes,
-- teams that strongly prefer conventional organization.
-
-Why hybrid modular monolith + vertical slices may be better:
-
-- features stay together,
-- business modules are clearer,
-- less generic service/repository ceremony,
-- easier to enforce boundaries as the app grows.
-
-### 16.2 Clean Architecture
-
-Typical structure:
-
-```text
-Domain/
-Application/
-Infrastructure/
-Presentation/
-```
-
-Pros:
-
-- strong separation of concerns,
-- domain logic can be isolated,
-- infrastructure dependencies are controlled,
-- works well for complex domains,
-- testable when implemented carefully.
-
-Cons:
-
-- often overused for simple applications,
-- many abstractions can appear before they are needed,
-- code for one feature can be scattered across projects/layers,
-- mapping overhead can become large,
-- developers may focus more on dependency direction than feature clarity.
-
-When to use:
-
-- complex business domains,
-- long-lived enterprise systems,
-- systems where domain logic must be highly isolated,
-- applications with volatile infrastructure choices.
-
-Why hybrid modular monolith + vertical slices may be better:
-
-- keeps use cases easier to find,
-- allows direct data access when pragmatic,
-- avoids unnecessary repository and mediator layers,
-- can still preserve domain isolation where needed.
-
-Important nuance:
-
-```text
-Hybrid modular monolith + vertical slices does not reject Clean Architecture.
-It rejects applying Clean Architecture mechanically everywhere.
-```
-
-A module with complex domain behavior can still use clean architecture internally. A simple module can stay direct.
-
-### 16.3 Hexagonal Architecture / Ports and Adapters
-
-Core idea:
-
-```text
-Business logic depends on ports.
-Infrastructure implements adapters.
-```
-
-Pros:
-
-- excellent for isolating external systems,
-- useful for payment gateways, email providers, file storage, APIs,
-- supports test doubles for external dependencies,
-- protects business logic from infrastructure volatility.
-
-Cons:
-
-- can create too many interfaces,
-- unnecessary for simple database-backed CRUD,
-- can be confusing when every dependency becomes a port,
-- may add ceremony before the domain justifies it.
-
-When to use:
-
-- integrations with external providers,
-- systems with swappable infrastructure,
-- domains where external dependencies are unstable,
-- applications with strong test isolation requirements.
-
-How it fits the hybrid approach:
-
-```text
-Use ports/adapters at real boundaries.
-Do not wrap everything by default.
-```
-
-For example, use an interface for an email sender, payment gateway, file store, or external API client. Do not create an interface for every small internal class.
-
-### 16.4 Microservices
-
-Core idea:
-
-```text
-Split the system into independently deployable services.
-Each service owns its data and deployment lifecycle.
-```
-
-Pros:
-
-- independent deployment,
-- independent scaling,
-- strong service boundaries,
-- team autonomy at large scale,
-- technology independence where needed,
-- fault isolation when designed well.
-
-Cons:
-
-- high operational complexity,
-- distributed transactions become hard,
-- debugging is harder,
-- local development is harder,
-- observability requirements increase,
-- network reliability becomes part of application logic,
-- data consistency becomes more complex,
-- deployment and infrastructure burden increases.
-
-When to use:
-
-- large teams,
-- independent deployment is required,
-- parts of the system need different scaling profiles,
-- organizational boundaries match service boundaries,
-- the team has strong DevOps and observability maturity.
-
-When not to use:
-
-- solo developer projects,
-- early-stage products,
-- small teams without platform support,
-- domains whose boundaries are still changing,
-- applications that can scale as one deployable.
-
-Why hybrid modular monolith + vertical slices may be better:
-
-- gives internal boundaries without distributed systems cost,
-- keeps deployment simple,
-- allows faster feature development,
-- can evolve toward services later if boundaries become proven.
-
-Key principle:
-
-```text
-A well-structured modular monolith is often the best starting point before microservices.
-```
-
-### 16.5 Service-Oriented Architecture
-
-SOA often uses coarser services and enterprise integration patterns.
-
-Pros:
-
-- useful in large organizations,
-- supports integration across systems,
-- promotes service contracts,
-- can work well for enterprise workflows.
-
-Cons:
-
-- can become heavyweight,
-- may require governance overhead,
-- shared enterprise models can become bloated,
-- integration complexity can dominate development.
-
-When to use:
-
-- enterprise environments,
-- integration-heavy organizations,
-- multiple systems sharing business processes.
-
-Why hybrid modular monolith + vertical slices may be better for a product application:
-
-- less governance,
-- faster iteration,
-- simpler deployment,
-- easier local reasoning.
-
-### 16.6 Event-Driven Architecture
-
-Core idea:
-
-```text
-Components communicate by publishing and consuming events.
-```
-
-Pros:
-
-- decouples producers and consumers,
-- supports async workflows,
-- useful for audit trails and projections,
-- scales well for integration-heavy systems,
-- works well with outbox and message brokers.
-
-Cons:
-
-- eventual consistency is harder to reason about,
-- debugging event flows can be difficult,
-- ordering and idempotency matter,
-- simple workflows can become unnecessarily complex,
-- hidden coupling can move from code to event contracts.
-
-When to use:
-
-- async workflows,
-- background processing,
-- notifications,
-- audit logs,
-- projections,
-- integration between bounded contexts.
-
-How it fits the hybrid approach:
-
-```text
-Use events for reactions and async side effects.
-Use direct calls for immediate required behavior.
-```
-
-Do not turn every method call into an event.
-
-### 16.7 CQRS
-
-Core idea:
-
-```text
-Separate commands that change state from queries that read state.
-```
-
-Pros:
-
-- useful for complex read models,
-- supports optimized queries,
-- clarifies write vs read intent,
-- works well with vertical slices,
-- can reduce overgeneralized service methods.
-
-Cons:
-
-- full CQRS with separate stores is complex,
-- eventual consistency may be introduced,
-- unnecessary for simple CRUD,
-- can lead to duplicate models.
-
-When to use:
-
-- complex querying,
-- high read/write asymmetry,
-- reporting screens,
-- workflow-heavy systems,
-- features where read and write models naturally differ.
-
-How it fits the hybrid approach:
-
-```text
-Use simple CQRS naming at the feature level.
-Do not introduce separate databases unless needed.
-```
-
-Example:
-
-```text
-Features/
-  PlaceOrder/        command-style write slice
-  GetOrderHistory/   query-style read slice
-```
-
-### 16.8 Domain-Driven Design
-
-DDD is not just folder structure. It is a way to model complex business domains.
-
-Pros:
-
-- strong domain modeling,
-- clear bounded contexts,
-- ubiquitous language,
-- good for complex business rules,
-- helps prevent anemic models in rule-heavy systems.
-
-Cons:
-
-- often misapplied to CRUD apps,
-- terminology can become performative,
-- aggregates can be overdesigned,
-- requires domain understanding,
-- not every module needs rich domain modeling.
-
-When to use:
-
-- complex domains,
-- non-trivial business rules,
-- workflows with invariants,
-- systems where language precision matters.
-
-How it fits the hybrid approach:
-
-```text
-Use DDD concepts where the domain deserves them.
-Keep simple modules simple.
-```
-
-A module can have rich aggregates if needed. Another module can be mostly transaction scripts and direct EF Core queries. That is acceptable.
-
----
-
-## 17. When This Architecture Is a Good Fit
-
-This architecture is applicable when:
-
-- the application is expected to grow beyond basic CRUD,
-- the team wants one deployable backend,
-- microservices would be premature,
-- feature work should be easy to locate,
-- business areas can be identified,
-- the domain has some complexity but not enough to justify heavy architecture everywhere,
-- the team wants clear boundaries without distributed systems overhead,
-- the codebase must be understandable by agents, new developers, or small teams,
-- the system needs pragmatic testing and fast iteration.
-
-Typical examples:
-
-- SaaS products,
-- internal business applications,
-- marketplace platforms,
-- workflow systems,
-- content platforms,
-- booking systems,
-- media libraries,
-- inventory systems,
-- learning platforms,
-- finance/admin tools,
-- early-stage products that may scale later.
-
----
-
-## 18. When This Architecture Is Not a Good Fit
-
-Avoid or modify this architecture when:
-
-- the application is a tiny CRUD app with no expected growth,
-- the system requires independently deployable services from day one,
-- different modules require radically different technology stacks,
-- teams are already organized around separate service ownership,
-- the organization has mature platform support for microservices,
-- the application is mostly a script or data pipeline,
-- the domain is so simple that modules add more structure than value.
-
-No architecture is free. A modular monolith still requires discipline. Without tests and rules, it can degrade into a normal tangled monolith.
-
----
-
-## 19. Practical Implementation Steps
-
-### Step 1: Start With One Deployable
-
-Create one backend application.
-
-Do not split into services early.
-
-```text
-One API.
-One deployment pipeline.
-One database.
-One local development setup.
-```
-
-This keeps the system easy to run and debug.
-
-### Step 2: Define Initial Modules
-
-Choose modules based on business capabilities, not database tables.
-
-Bad module names:
-
-```text
-UsersTable
-OrdersTable
-ProductService
-Common
-Helpers
-```
-
-Better module names:
-
-```text
-Identity
-Catalog
-Orders
-Billing
-Notifications
-Reporting
-```
-
-Module boundaries will improve over time. The goal is a reasonable starting point, not perfect domain decomposition.
-
-### Step 3: Create Feature Slices Inside Modules
-
-Each use case gets a folder.
+Many vertical-slice examples put feature folders directly under modules:
 
 ```text
 Modules/
@@ -1430,268 +189,705 @@ Modules/
     Features/
       PlaceOrder/
       CancelOrder/
-      GetOrderHistory/
 ```
 
-Do not place all requests in one global `Requests` folder. Do not place all handlers in one global `Handlers` folder. Keep code close to the use case.
+That can work, but this version keeps Core focused on business concepts instead of callable actions.
 
-### Step 4: Add Shared and Infrastructure Carefully
-
-Create shared code only when multiple modules genuinely need it.
-
-Start small:
+Core modules should look more like this:
 
 ```text
-Shared/
-  Results/
-  Errors/
-  Validation/
-  Pagination/
-  Time/
-
-Infrastructure/
-  Persistence/
-  Caching/
-  Email/
-  BackgroundJobs/
-  Observability/
+Shop.Core/
+  Modules/
+    ModuleName/
+      Contracts/
+      Domain/
+      Policies/
+      Internal/
+      Models/
 ```
 
-Do not create a large shared kernel before the application proves what is actually shared.
+Core owns:
 
-### Step 5: Use Direct Data Access First
+- business language,
+- module contracts,
+- domain models,
+- validation that belongs to the business concept,
+- module-local policies,
+- outcomes that are meaningful inside the module.
 
-Use the ORM directly inside feature handlers unless there is a concrete reason not to.
+Core does not own:
 
-This keeps code easy to follow.
+- HTTP endpoints,
+- CLI commands,
+- background services,
+- EF entities,
+- provider clients,
+- template rendering,
+- application result types,
+- `UseCase` classes,
+- `Features` folders.
 
-Add repositories only when they remove complexity rather than add it.
+The reason is simple: Core should describe the business, not how a user or system asks the application to do something.
 
-### Step 6: Enforce Module Boundaries
+---
 
-Document the dependency rules and enforce them with architecture tests.
+## 6. Application Owns the Vertical Slices
 
-Rules should include:
+Callable behavior lives in Application:
 
 ```text
-Modules cannot reference another module's Domain folder.
-Modules cannot reference another module's Features folder.
-Modules cannot reference another module's Persistence configuration.
-Modules may reference another module's Contracts folder.
-Domain code cannot depend on ASP.NET Core types.
-Endpoints must stay thin.
-Handlers must not be reused as cross-module services.
+Shop.Application/
+  UseCases/
+    ModuleName/
+      VerbFirstAction.cs
+      OptionalModuleModels.cs
 ```
 
-### Step 7: Add Integration Tests Around Features
+Good names:
 
-Test important behavior through endpoint or handler integration tests.
+```text
+PlaceOrder
+CancelOrder
+TrackDelivery
+SearchProducts
+GenerateInvoice
+```
 
-Focus on:
+Avoid suffix-heavy names:
 
-- auth,
-- ownership,
-- duplicate prevention,
-- validation,
+```text
+PlaceOrderUseCase
+SendReceiptWorkflow
+TrackDeliveryService
+```
+
+The action name should already say what it does.
+
+Application use cases own their public request and response DTOs. They may map to Core types internally, but they should not leak Core models through public `Execute*` method parameters or return values.
+
+Rule:
+
+```text
+The Application boundary exposes Application contracts.
+Core contracts are internal implementation details from the caller's point of view.
+```
+
+---
+
+## 7. Generic Example: Online Ordering
+
+Imagine a simple online ordering system with these modules:
+
+```text
+Customers
+Menu
+Orders
+Payments
+Notifications
+```
+
+The Core modules might expose contracts and domain rules:
+
+```text
+Shop.Core/
+  Modules/
+    Customers/
+      Contracts/
+        ICustomerLookup.cs
+      Domain/
+        CustomerStatus.cs
+
+    Menu/
+      Contracts/
+        IMenuLookup.cs
+      Domain/
+        MenuItemAvailability.cs
+
+    Orders/
+      Contracts/
+        IOrderStore.cs
+      Domain/
+        Order.cs
+        OrderPolicy.cs
+
+    Payments/
+      Contracts/
+        IPaymentAuthorizer.cs
+```
+
+The callable use case lives in Application:
+
+```text
+Shop.Application/
+  UseCases/
+    Orders/
+      PlaceOrder.cs
+```
+
+The file might contain:
+
+```csharp
+namespace Shop.Application.UseCases.Orders;
+
+public sealed record PlaceOrderRequest(
+    Guid CustomerId,
+    IReadOnlyList<OrderItemRequest> Items,
+    string PaymentMethodId);
+
+public sealed record OrderItemRequest(
+    Guid MenuItemId,
+    int Quantity);
+
+public sealed record PlaceOrderResponse(
+    Guid OrderId,
+    decimal Total,
+    DateTimeOffset EstimatedReadyAt);
+
+public sealed class PlaceOrder(
+    ICustomerLookup customers,
+    IMenuLookup menu,
+    IPaymentAuthorizer payments,
+    IOrderStore orders,
+    TimeProvider clock)
+{
+    public async Task<Result<PlaceOrderResponse>> ExecuteAsync(
+        PlaceOrderRequest request,
+        CancellationToken cancellationToken)
+    {
+        var customer = await customers.FindAsync(request.CustomerId, cancellationToken);
+        if (customer is null)
+            return Result<PlaceOrderResponse>.NotFound("Customer.NotFound", "Customer was not found.");
+
+        var itemIds = request.Items.Select(x => x.MenuItemId).Distinct().ToArray();
+        var menuItems = await menu.FindAvailableItemsAsync(itemIds, cancellationToken);
+
+        var decision = OrderPolicy.CanPlaceOrder(
+            customer,
+            menuItems,
+            request.Items,
+            clock.GetUtcNow());
+        if (!decision.Allowed)
+            return Result<PlaceOrderResponse>.Conflict("Order.NotAllowed", decision.Reason);
+
+        var authorization = await payments.AuthorizeAsync(
+            request.PaymentMethodId,
+            decision.Total,
+            cancellationToken);
+        if (!authorization.Approved)
+            return Result<PlaceOrderResponse>.Conflict("Payment.Declined", authorization.Message);
+
+        var order = Order.Place(
+            customer.Id,
+            decision.Items,
+            authorization.AuthorizationId,
+            decision.EstimatedReadyAt);
+
+        await orders.SaveAsync(order, cancellationToken);
+
+        return Result<PlaceOrderResponse>.Success(
+            new PlaceOrderResponse(order.Id, order.Total, order.EstimatedReadyAt));
+    }
+}
+```
+
+The important parts are the boundaries:
+
+```text
+PlaceOrder is callable from outside the module.
+PlaceOrder uses Core contracts and domain policy.
+PlaceOrder returns Application-owned DTOs.
+PlaceOrder does not expose database entities.
+PlaceOrder does not know whether the caller is HTTP, CLI, mobile, or a background job.
+```
+
+---
+
+## 8. Cross-Module Orchestration
+
+Some use cases naturally coordinate more than one module.
+
+Cross-module orchestration belongs in the Application use case owned by the initiating module. Do not create a generic `Workflows` folder just because a use case touches several concepts.
+
+Generic example:
+
+```text
+UseCases/
+  Orders/
+    PlaceOrderAndSendReceipt.cs
+```
+
+That action belongs under `Orders` because the user intent is to place an order. It may call:
+
+```text
+Customers contract
+Menu contract
+Orders contract
+Payments contract
+Notifications contract
+```
+
+But it should not become:
+
+```text
+UseCases/
+  Workflows/
+    PlaceOrderAndSendReceiptWorkflow.cs
+```
+
+The module that owns the user intent should own the Application action unless there is an explicit architecture decision that no module can honestly own it.
+
+---
+
+## 9. Infrastructure Owns Technical Reality
+
+Infrastructure implements Core contracts and owns technical details.
+
+This includes things like:
+
 - database persistence,
-- transactions,
-- pagination,
-- important business rules.
+- EF Core entities and mappings,
+- migrations,
+- database stores,
+- email or SMS providers,
+- template rendering,
+- provider-specific options,
+- embedded templates,
+- external HTTP clients,
+- file storage,
+- queues or outbox processors.
 
-### Step 8: Add Observability Early
+Infrastructure may map between Core domain models and database entities. It may choose table shape, indexes, row versions, provider payload storage, JSON columns, and EF navigation properties.
 
-Even a monolith needs observability.
+Core should not be forced to look like the database.
 
-Add:
-
-- structured logging,
-- request correlation IDs,
-- error logging,
-- health checks,
-- metrics where useful,
-- background job visibility.
-
-This helps debugging before complexity grows.
-
-### Step 9: Keep Documentation Close to Architecture
-
-Maintain a small architecture guide in the repository.
-
-It should define:
-
-- module rules,
-- feature folder rules,
-- data ownership rules,
-- API conventions,
-- test expectations,
-- what not to do,
-- how to add a new feature.
-
-Documentation matters because architecture is a set of decisions, not just folders.
-
----
-
-## 20. Feature Implementation Checklist
-
-When adding a new backend feature:
+Generic example:
 
 ```text
-1. Identify the owning module.
-2. Create a feature folder under that module.
-3. Add request and response models.
-4. Add a validator for request-level validation.
-5. Add a handler for use case orchestration.
-6. Keep endpoint/controller/message handler thin.
-7. Use the module's domain rules where needed.
-8. Use direct DbContext access unless abstraction is justified.
-9. Respect data ownership rules.
-10. Add tests for important behavior.
-11. Register services in the module registration file.
-12. Register route or message mapping in the module registration file.
-13. Update documentation if route, module boundary, or architecture rules changed.
+Core concept:
+  Order
+  OrderTotal
+  OrderStatus
+
+Infrastructure table shape:
+  order_records
+  order_items
+  payment_authorization_id
+  status_text
+  provider_correlation_id
+  row_version
+```
+
+Those are not the same thing, and that is fine.
+
+Rule:
+
+```text
+Core names the business concept.
+Infrastructure chooses the persistence shape.
+Application decides which use case is exposed.
+Entrypoints decide how transport input and output are represented.
 ```
 
 ---
 
-## 21. Anti-Patterns to Avoid
+## 10. Entrypoints Stay Thin
 
-### 21.1 Fake Repositories Everywhere
+An entrypoint adapts a transport to Application.
+
+For HTTP, that means:
+
+```text
+Read route/body/header data.
+Create an Application request.
+Call an Application use case.
+Convert the Application result to an HTTP response.
+```
+
+Generic example:
+
+```csharp
+group.MapPost("/orders", async (
+        PlaceOrderRequest request,
+        PlaceOrder placeOrder,
+        CancellationToken cancellationToken) =>
+    {
+        var result = await placeOrder.ExecuteAsync(request, cancellationToken);
+        return result.ToHttpResult();
+    });
+```
+
+The endpoint does not:
+
+- enforce domain rules itself,
+- query EF directly,
+- call provider clients directly,
+- construct Core entities as a public contract,
+- duplicate Application validation.
+
+The same idea applies to a CLI command, bot command, mobile host, desktop UI, or worker:
+
+```text
+Transport in.
+Application request.
+Application result.
+Transport out.
+```
+
+---
+
+## 11. Data Access and Ownership
+
+A modular monolith is not a set of microservices. The practical default is:
+
+```text
+One application database.
+Infrastructure-owned database context.
+Logical table ownership by module.
+Application use cases call Core contracts.
+Infrastructure implements those contracts.
+```
+
+This avoids pretending every module is already independently deployed.
+
+The ownership rule is:
+
+```text
+Only the owning module writes to its logical data.
+Other modules read through contracts, read models, or Application orchestration.
+```
+
+Generic example:
+
+| Module | Owned Data |
+|---|---|
+| Customers | customer profiles, saved addresses, account state |
+| Menu | products, prices, item availability |
+| Orders | order records, order items, fulfillment status |
+| Payments | payment attempts, authorization state |
+| Notifications | notification attempts, delivery state |
+
+If the Orders use case needs a product name or price, it should not mutate Menu tables. It can read through a Menu contract or use a read model designed for that purpose.
+
+---
+
+## 12. Reliable Side Effects
+
+Side effects should not make the primary user action unreliable when they can be handled after durable intake.
+
+Generic example:
+
+```text
+Place order.
+Save the order.
+Save a receipt outbox job.
+Return success.
+Background worker sends the receipt later.
+```
+
+This avoids a fragile flow:
+
+```text
+Place order.
+Save the order.
+Try to send the receipt immediately.
+Email provider fails.
+The user action appears to fail even though the order was saved.
+```
+
+The broader rule:
+
+```text
+If work must not be lost, persist it before doing external side effects.
+```
+
+---
+
+## 13. Validation and Results
+
+Use two levels of validation:
+
+```text
+Request validation = input shape and basic correctness.
+Business validation = rules based on current domain state.
+```
+
+Request validation examples:
+
+- required fields,
+- maximum lengths,
+- valid email format,
+- positive quantities,
+- valid enum values.
+
+Business validation examples:
+
+- a customer cannot place an order with an inactive account,
+- an item cannot be ordered when unavailable,
+- payment must be authorized before the order is confirmed,
+- an order cannot be cancelled after delivery starts.
+
+Application owns result primitives because entrypoints need a stable way to translate outcomes into transport responses.
+
+Generic result statuses might map like this:
+
+| Result Status | HTTP Meaning |
+|---|---|
+| Success | `200 OK` |
+| Accepted | `202 Accepted` |
+| Created | `201 Created` |
+| Validation | `400 Bad Request` |
+| NotFound | `404 Not Found` |
+| Conflict | `409 Conflict` |
+
+Core should not own these transport-facing result types. Core can return module-specific decisions or outcomes. Application translates those into caller-facing results.
+
+---
+
+## 14. Configuration and Options
+
+Configuration belongs to the layer that needs it.
+
+Strongly typed options make configuration discoverable and testable. Option classes should expose a clear section name and defaults where defaults are safe.
+
+Generic example:
+
+```csharp
+public sealed class EmailDeliveryOptions
+{
+    public const string SectionName = "Notifications:Email";
+
+    public string Provider { get; init; } = "Smtp";
+    public int TimeoutSeconds { get; init; } = 30;
+}
+```
+
+The caller should not need to guess whether the real setting is `EMAIL_TIMEOUT`, `Email:Timeout`, `Mail:TimeoutSeconds`, or something else. The code should define the contract.
+
+Rule:
+
+```text
+Configuration is a contract.
+Make it typed, discoverable, and owned by the layer that consumes it.
+```
+
+---
+
+## 15. Architecture Tests
+
+Architecture rules should be executable.
+
+Useful tests include:
+
+- Core must not reference Application, Infrastructure, or entrypoints.
+- Core must not reference framework or provider packages unless explicitly allowed.
+- Core must not expose a global `Shared` namespace by default.
+- Core must not contain `Features` namespaces.
+- Application must not reference Infrastructure or entrypoints.
+- Application `Execute*` contracts must not expose Core DTOs.
+- Application callable types must avoid `UseCase` and `Workflow` suffixes.
+- Infrastructure must not reference Application or entrypoints.
+- Entrypoints must not reference Core directly.
+
+This matters because architecture written only in Markdown slowly becomes a suggestion. Architecture tested in CI becomes a working constraint.
+
+---
+
+## 16. Adding a New Feature
+
+When adding a new backend feature, use this checklist:
+
+```text
+1. Identify the owning business module.
+2. Put business contracts and domain concepts in Core.
+3. Put the callable action in Application/UseCases/<Module>.
+4. Use a verb-first, suffix-less action name.
+5. Keep request and response DTOs Application-owned.
+6. Keep cross-module orchestration in the module that owns the user intent.
+7. Implement Core contracts in Infrastructure.
+8. Keep EF entities and provider details out of Core.
+9. Keep endpoints, commands, and workers thin.
+10. Register services through the appropriate composition root.
+11. Add focused tests for behavior.
+12. Add or update architecture tests if the rule surface changes.
+13. Update docs when the module boundary or dependency rule changes.
+```
+
+Do not start by creating a controller, repository, service, mapper, and DTO folder. Start by identifying the use case and the module that owns it.
+
+---
+
+## 17. Anti-Patterns to Avoid
+
+### 17.1 Core as a Dumping Ground
+
+Core should not become the place where every shared type goes.
 
 Bad:
 
 ```text
-IProductRepository
-IOrderRepository
-IUserRepository
-IGenericRepository<T>
-IUnitOfWork
+Shop.Core/
+  Shared/
+  Helpers/
+  Features/
+  Http/
+  Persistence/
 ```
 
-This often duplicates ORM behavior and hides useful query details.
+Better:
 
-Use repositories only when they add meaningful abstraction.
+```text
+Core module owns business concepts.
+Application owns caller-facing primitives.
+Infrastructure owns technical implementations.
+```
 
-### 21.2 God Services
+### 17.2 Generic Services for Every Module
+
+Avoid broad service classes with unrelated methods.
 
 Bad:
 
 ```text
 OrderService
-UserService
-ProductService
+  PlaceOrder
+  CancelOrder
+  RefundOrder
+  TrackDelivery
+  SendReceipt
+  ExportOrders
 ```
 
-with dozens of unrelated methods.
-
-Prefer feature handlers:
+Better:
 
 ```text
-PlaceOrderHandler
-CancelOrderHandler
-GetOrderHistoryHandler
+PlaceOrder
+CancelOrder
+RefundOrder
+TrackDelivery
+SendReceipt
+ExportOrders
 ```
 
-### 21.3 Global DTO Folders
+Each callable action should be easy to read without understanding an entire service class.
+
+### 17.3 Infrastructure Leaking Into Application
+
+Application should not know that a store uses PostgreSQL, EF Core, SMTP, a payment provider SDK, a template engine, or a file system.
 
 Bad:
 
 ```text
-DTOs/
-  CreateOrderRequest.cs
-  CancelOrderRequest.cs
-  ProductResponse.cs
+Application use case creates DbContext.
+Application use case creates provider HTTP client.
+Application request exposes EF entity.
 ```
 
-Feature-specific models should live with their feature.
+Better:
 
-Shared models should exist only when they are truly shared contracts.
+```text
+Application depends on Core contracts.
+Infrastructure implements those contracts.
+Entrypoint wires both together.
+```
 
-### 21.4 Shared Everything
+### 17.4 Entrypoints Calling Core Directly
 
-A large `Shared` folder becomes a second monolith inside the monolith.
+Calling Core directly from API, CLI, bot, UI, or worker code bypasses the Application facade.
 
-Move business-specific code back into modules.
+That creates duplicated orchestration and makes every adapter invent its own behavior.
 
-### 21.5 Module Boundary Theater
+The rule is:
 
-A folder named `Modules` does not create modularity by itself.
+```text
+Entrypoints call Application.
+Application coordinates Core contracts.
+Infrastructure does the technical work.
+```
 
-Modularity requires:
+### 17.5 Premature Workflow Folders
 
-- ownership rules,
-- dependency rules,
-- architecture tests,
-- stable contracts,
-- disciplined writes,
-- controlled sharing.
+Do not create a generic `Workflows` namespace just because a use case coordinates multiple modules.
 
-### 21.6 Premature Microservice Design Inside a Monolith
+Prefer:
 
-Do not force every module to have its own database, message bus, API client, and deployment boundary while still deploying as one app.
+```text
+UseCases/
+  Orders/
+    PlaceOrderAndSendReceipt.cs
+```
 
-That creates microservice pain without microservice benefits.
+Avoid:
+
+```text
+UseCases/
+  Workflows/
+    PlaceOrderAndSendReceiptWorkflow.cs
+```
+
+Use the module that owns the user intent.
 
 ---
 
-## 22. How This Architecture Can Evolve
+## 18. How This Can Evolve
 
-A modular monolith can evolve in stages.
+The architecture can grow in stages.
 
-### Stage 1: Simple Modular Monolith
+### Stage 1: Focused Modular Monolith
 
 ```text
-One application.
+One backend.
 One database.
-Modules as folders.
-Vertical slices inside modules.
+Core modules.
+Application use cases.
+Infrastructure implementations.
+Thin entrypoints.
 ```
 
-### Stage 2: Stronger Internal Boundaries
+### Stage 2: More Entrypoints
 
 ```text
-Module contracts.
-Architecture tests.
-Outbox for important events.
-Module-owned table rules.
+API calls Application.
+CLI calls Application.
+Bot calls Application.
+Mobile host calls Application.
+Background workers call Application.
 ```
 
-### Stage 3: Extracted Service Candidate
+The use-case surface stays stable even as adapters are added.
 
-Only consider extracting a module when:
+### Stage 3: Stronger Module Contracts
 
-- the boundary is stable,
-- the module has independent scaling needs,
-- the module has a separate team owner,
-- the module has clear contracts,
-- data ownership is already clean,
-- deployment independence is worth the operational cost.
+```text
+Clear module contracts.
+Architecture tests.
+Outbox for reliable side effects.
+Explicit table ownership.
+Focused integration tests.
+```
 
-### Stage 4: Service Extraction
+### Stage 4: Service Extraction Only If Needed
 
-Extraction becomes easier because the module already has:
+A module should be extracted only when the reason is real:
 
-- a defined boundary,
-- contracts,
-- owned data,
-- feature organization,
-- tests,
-- reduced dependency on other internals.
+- independent scaling is required,
+- independent deployment is worth the cost,
+- the module boundary is stable,
+- the data ownership is clean,
+- the team has operational maturity for distributed systems.
 
-A modular monolith does not guarantee easy extraction, but it makes extraction far more realistic than a tangled layered monolith.
+Until then, the modular monolith gives most of the benefit with far less runtime complexity.
 
 ---
 
-## 23. Decision Matrix
+## 19. Decision Matrix
 
-| Criterion | Layered App | Clean Architecture | Modular Monolith + Vertical Slices | Microservices |
+| Criterion | Layered App | Clean Architecture | Modular Monolith With Application Slices | Microservices |
 |---|---:|---:|---:|---:|
 | Startup simplicity | High | Medium | Medium | Low |
 | Feature discoverability | Medium | Medium | High | Medium |
 | Business boundary clarity | Low | Medium | High | High |
 | Deployment simplicity | High | High | High | Low |
 | Operational complexity | Low | Low | Low | High |
-| Scaling teams independently | Low | Medium | Medium | High |
-| Scaling runtime independently | Low | Low | Low/Medium | High |
 | Works for small teams | High | Medium | High | Low |
 | Protects against tangling | Low | Medium | High if enforced | High if designed well |
 | Ceremony risk | Low | High | Medium | High |
@@ -1699,50 +895,19 @@ A modular monolith does not guarantee easy extraction, but it makes extraction f
 
 ---
 
-## 24. Recommended Rules Summary
+## 20. Final Position
 
-Use these as the architecture constitution:
-
-```text
-1. One backend deployable by default.
-2. Organize business areas as modules.
-3. Organize use cases as vertical slices inside modules.
-4. Keep endpoints thin.
-5. Put use case orchestration in handlers.
-6. Put reusable business rules in module domain code.
-7. Put cross-cutting utilities in Shared only when truly shared.
-8. Put technical implementations in Infrastructure.
-9. Use direct ORM access unless abstraction is justified.
-10. Do not create generic repositories by default.
-11. Do not create a UnitOfWork abstraction by default.
-12. A module may reference another module's Contracts.
-13. A module must not reference another module's internals.
-14. Writes must respect module ownership.
-15. Reads may compose pragmatically.
-16. Use in-process events for reactions.
-17. Use an outbox when reliable async work matters.
-18. Add architecture tests to enforce boundaries.
-19. Keep documentation updated when architecture changes.
-20. Prefer clarity over pattern purity.
-```
-
----
-
-## 25. Final Position
-
-Hybrid modular monolith + vertical slice architecture is a strong default for many modern applications because it solves the most common growth problem: a codebase that starts simple but becomes hard to change.
+Hybrid modular monolith with application-owned vertical slices is a strong default for many growing applications.
 
 It gives developers:
 
 - one deployable system,
 - clear business modules,
-- feature-focused code organization,
-- pragmatic data access,
-- enforceable boundaries,
-- a path toward future service extraction,
-- fewer unnecessary abstractions than many enterprise templates,
-- less operational burden than microservices.
+- callable use cases that are easy to find,
+- a pure business core,
+- infrastructure isolated from callers,
+- thin entrypoints,
+- enforceable dependency rules,
+- a future path toward service extraction if a boundary proves it deserves one.
 
-The architecture works best when treated as a practical discipline, not a rigid religion.
-
-The goal is not to prove that every dependency points in the perfect direction. The goal is to make the next feature easy to add, the next bug easy to locate, and the next architectural decision obvious from the structure of the code.
+The goal is not architectural ceremony. The goal is to make the next feature easier to place, easier to test, and easier to expose through whichever entrypoint needs it.

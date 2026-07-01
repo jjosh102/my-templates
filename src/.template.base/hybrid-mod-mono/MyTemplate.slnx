@@ -1,6 +1,10 @@
 <Solution>
   <Project Path="MyTemplate.Api/MyTemplate.Api.csproj" />
+  <Project Path="MyTemplate.Application/MyTemplate.Application.csproj" />
+  <Project Path="MyTemplate.ArchitectureTests/MyTemplate.ArchitectureTests.csproj" />
   <Project Path="MyTemplate.AppHost/MyTemplate.AppHost.csproj" />
+  <Project Path="MyTemplate.Core/MyTemplate.Core.csproj" />
+  <Project Path="MyTemplate.Infrastructure/MyTemplate.Infrastructure.csproj" />
   <Project Path="MyTemplate.IntegrationTests/MyTemplate.IntegrationTests.csproj" />
   <Project Path="MyTemplate.ServiceDefaults/MyTemplate.ServiceDefaults.csproj" />
   <Project Path="MyTemplate.UnitTests/MyTemplate.UnitTests.csproj" />

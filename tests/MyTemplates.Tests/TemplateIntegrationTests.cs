@@ -114,6 +114,18 @@ public class TemplateIntegrationTests : IClassFixture<TemplatePackageFixture>
 
         Assert.True(File.Exists(Path.Combine(outputDir, "TestApp.slnx")),
             "Expected TestApp.slnx to exist.");
+        Assert.True(Directory.Exists(Path.Combine(outputDir, "TestApp.Core")),
+            "Expected the Core project to exist.");
+        Assert.True(Directory.Exists(Path.Combine(outputDir, "TestApp.Application")),
+            "Expected the Application project to exist.");
+        Assert.True(Directory.Exists(Path.Combine(outputDir, "TestApp.Infrastructure")),
+            "Expected the Infrastructure project to exist.");
+        Assert.True(Directory.Exists(Path.Combine(outputDir, "TestApp.Api")),
+            "Expected the Api project to exist.");
+        Assert.True(Directory.Exists(Path.Combine(outputDir, "TestApp.ArchitectureTests")),
+            "Expected the ArchitectureTests project to exist.");
+        Assert.False(Directory.Exists(Path.Combine(outputDir, "TestApp.Api", "Modules", "Orders", "Features")),
+            "Did not expect the old API-owned Features folder.");
         Assert.False(Directory.Exists(Path.Combine(outputDir, "scripts")),
             "Did not expect a scripts/ directory.");
         Assert.False(File.Exists(Path.Combine(outputDir, ".editorconfig")),

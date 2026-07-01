@@ -18,8 +18,4 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\MyTemplate.Core\MyTemplate.Core.csproj" />
-  </ItemGroup>
-
 </Project>
